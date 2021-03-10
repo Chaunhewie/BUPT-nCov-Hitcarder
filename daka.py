@@ -162,12 +162,12 @@ def run():
         print("请创建config.json文件到项目路径({})下，内容如下：".format(os.getcwd(), msg))
         return
 
-    configs = json.loads(open('./config.json', 'r').read())
+    configs = json.loads(open('./config.json', 'r', encoding="utf-8").read())
     sms_api_key = configs.get("sms_api_key", "")
     for config in configs["info"]:
         username = config["username"]
         password = config["password"]
-        sms_number = config["sms_number"]
+        sms_number = config.get("sms_number", "")
         scheduler_flag = config["schedule"]["on"]
         hour = config["schedule"]["hour"]
         minute = config["schedule"]["minute"]
