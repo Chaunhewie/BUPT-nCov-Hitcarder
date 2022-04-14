@@ -3,6 +3,7 @@
 import os
 import requests, json, re
 import time, datetime
+from bs4 import BeautifulSoup
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 
@@ -17,29 +18,33 @@ class DaKa(object):
         self.login_url = "https://app.bupt.edu.cn/uc/wap/login?redirect=https%3A%2F%2Fapp.bupt.edu.cn%2Fncov%2Fwap%2Fdefault%2Findex"
         self.base_url = "https://app.bupt.edu.cn/ncov/wap/default/index"
         self.save_url = "https://app.bupt.edu.cn/ncov/wap/default/save"
-        self.login_check_url = "https://app.bupt.edu.cn/uc/wap/login/check"
+        self.login_check_url = "https://auth.bupt.edu.cn/authserver/login"
         self.sess = requests.Session()
 
         # self.sms_url_api = "https://api.binstd.com/sms/send?mobile={}&content={}&appkey={}"
-        self.sms_url_api = 'https://sc.ftqq.com/{}.send?text={}&desp={}'
+        self.sms_url_api = 'https://sctapi.ftqq.com/{}.send?text={}&desp={}'
 
     def login(self):
         """Login to BUPT platform"""
         res = self.sess.get(self.login_url)
-        
         if res.status_code != 200:
             raise Exception("{} 登陆平台失败，失败代码{}".format(self.username,res.status_code))
+        inputs = BeautifulSoup(res.content.decode()).find("form", {"id":"loginForm"}).find_all("div", {"style":"display: none;"})[-1].find_all("input")
 
         data = {
             'username': self.username,
             'password': self.password,
+            'submit': "登录",
         }
-        res = self.sess.post(url=self.login_check_url, data=data)
-        ret = json.loads(res.content.decode())
+        for input in inputs:
+            data[input["name"]] = input["value"]
 
-        if ret['e'] != 0:
-            raise Exception("{} 登陆失败，原因{}".format(self.username,ret['m']))
-        return ret
+        res = self.sess.post(url=self.login_check_url, data=data)
+        if res.status_code != 200:
+            raise Exception("{} 登陆平台失败，失败代码{}".format(self.username, res.status_code))
+        if res.url.split("/")[-1] != "index":
+            raise Exception("{} 登陆平台失败，最终重定向非index路径：{}".format(res.url))
+        return "success"
     
     def post(self):
         """Post the hitcard info"""
@@ -167,7 +172,7 @@ def run():
     for config in configs["info"]:
         username = config["username"]
         password = config["password"]
-        sms_number = config.get("sms_number", "")
+        sms_number = config["sms_number"]
         scheduler_flag = config["schedule"]["on"]
         hour = config["schedule"]["hour"]
         minute = config["schedule"]["minute"]
